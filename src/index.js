@@ -1,0 +1,134 @@
+import * as esbuild from 'esbuild';
+import * as path from 'path';
+
+import {
+	compile,
+	processVanillaFile,
+	vanillaExtractFilescopePlugin
+} from '@vanilla-extract/integration';
+
+import { FSCache, getProjectRoot } from '@intrnl/fs-cache';
+
+
+const RE_CSS_FILTER = /\.css\.(js|mjs|jsx|ts|mts|tsx)$/i;
+const RE_VIRT_FILTER = /\?__css$/;
+const NS = 'vanilla-extract';
+
+const VERSION = 0;
+
+/** @returns {esbuild.Plugin} */
+export default function vanillaExtractPlugin (options = {}) {
+	const {
+		cache = true,
+		runtime,
+		processCss,
+		outputCss,
+		identifiers,
+		externals = [],
+	} = options;
+
+	if (runtime) {
+		return vanillaExtractFilescopePlugin();
+	}
+
+	return {
+		name: '@intrnl/esbuild-plugin-vanilla-extract',
+		async setup (build) {
+			const cssCache = new Map();
+
+			const cwd = build.initialOptions.absWorkingDir;
+			const identOption = identifiers ?? (build.initialOptions.minify ? 'short' : 'debug');
+
+			const fsCache = cache && new FSCache({
+				...await getProjectRoot('@intrnl/esbuild-plugin-vanilla-extract'),
+			});
+
+			build.onLoad({ filter: RE_CSS_FILTER }, async (args) => {
+				const { path: file, namespace } = args;
+
+				if (namespace !== 'file' && namespace !== '') {
+					return null;
+				}
+
+				const filename = path.relative('.', file);
+
+				const key = [
+					VERSION,
+					outputCss,
+					identOption,
+					externals,
+				];
+
+				const result = cache
+					? await fsCache.get(filename, key, () => loader(filename))
+					: await loader(filename);
+
+				cssCache.set(filename, result.css);
+
+				return {
+					loader: 'js',
+					contents: result.js,
+					watchFiles: result.dependencies,
+				};
+			});
+
+			build.onResolve({ filter: RE_VIRT_FILTER }, (args) => {
+				const { path: file, importer } = args;
+
+				const dirname = path.relative('.', path.dirname(importer));
+				const filename = path.join(dirname, file.slice(0, -6));
+
+				if (!cssCache.has(filename)) {
+					return null;
+				}
+
+				return {
+					namespace: NS,
+					path: filename,
+				};
+			});
+
+			build.onLoad({ filter: /./, namespace: NS }, async (args) => {
+				const { path: filename } = args;
+
+				let source = cssCache.get(filename);
+
+				if (typeof processCss === 'function') {
+					source = await processCss(source, filename);
+				}
+
+				return {
+					loader: 'css',
+					contents: source,
+				};
+			});
+
+			async function loader (filePath) {
+				const { source, watchFiles } = await compile({
+					filePath: filePath,
+					cwd,
+					externals,
+				});
+
+				let css = '';
+
+				const js = await processVanillaFile({
+					filePath: filePath,
+					source,
+					outputCss,
+					identOption,
+					serializeVirtualCssPath: ({ source }) => {
+						css = source;
+						return `import ${JSON.stringify(path.basename(filePath) + '?__css')};`;
+					},
+				});
+
+				return {
+					js,
+					css,
+					dependencies: watchFiles.reverse(),
+				};
+			}
+		},
+	};
+}

@@ -1,0 +1,25 @@
+{
+	"type": "module",
+	"name": "@intrnl/esbuild-plugin-vanilla-extract",
+	"description": "Fork of the official vanilla-extract esbuild plugin",
+	"version": "0.1.0",
+	"author": "intrnl",
+	"license": "MIT",
+	"repository": {
+		"url": "https://github.com/intrnl/esbuild-plugin-vanilla-extract"
+	},
+	"files": [
+		"src/"
+	],
+	"main": "src/index.js",
+	"peerDependencies": {
+		"esbuild": ">=0.13.15"
+	},
+	"dependencies": {
+		"@intrnl/fs-cache": "^0.2.3",
+		"@vanilla-extract/integration": "^2.0.0"
+	},
+	"devDependencies": {
+		"esbuild": "^0.14.1"
+	}
+}
