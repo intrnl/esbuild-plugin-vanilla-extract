@@ -118,6 +118,14 @@ export default function vanillaExtractPlugin (options = {}) {
 					outputCss,
 					identOption,
 					serializeVirtualCssPath: ({ fileScope, source }) => {
+						// Even though this also generates the corresponding CSS files for
+						// dependencies, we're ignoring them and opt for importing its
+						// original JS file instead.
+
+						// We can't expect its dependencies to already exist in the cache
+						// map, but we also don't want to fit the dependencies into another
+						// file's cache data.
+
 						const filename = path.resolve(fileScope.filePath);
 
 						if (filePath === filename) {
