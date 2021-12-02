@@ -1,5 +1,5 @@
 Fork of the official esbuild plugin, with a few changes:
 
-- Changes how generated CSS files are imported normally, this removes the noise
-  in the sourcemap.
+- Changes how generated CSS files are imported internally, this removes the
+  noise in the sourcemap.
 - Adds a basic filesystem cache.
