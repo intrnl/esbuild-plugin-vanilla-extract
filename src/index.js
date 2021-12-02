@@ -14,7 +14,7 @@ const RE_CSS_FILTER = /\.css\.(js|mjs|jsx|ts|mts|tsx)$/i;
 const RE_VIRT_FILTER = /\?__css$/;
 const NS = 'vanilla-extract';
 
-const VERSION = 0;
+const VERSION = 1;
 
 /** @returns {esbuild.Plugin} */
 export default function vanillaExtractPlugin (options = {}) {
@@ -44,13 +44,11 @@ export default function vanillaExtractPlugin (options = {}) {
 			});
 
 			build.onLoad({ filter: RE_CSS_FILTER }, async (args) => {
-				const { path: file, namespace } = args;
+				const { path: filename, namespace } = args;
 
 				if (namespace !== 'file' && namespace !== '') {
 					return null;
 				}
-
-				const filename = path.relative('.', file);
 
 				const key = [
 					VERSION,
@@ -63,7 +61,7 @@ export default function vanillaExtractPlugin (options = {}) {
 					? await fsCache.get(filename, key, () => loader(filename))
 					: await loader(filename);
 
-				cssCache.set(filename, result.css);
+				cssCache.set(path.relative('.', filename), result.css);
 
 				return {
 					loader: 'js',
@@ -104,6 +102,8 @@ export default function vanillaExtractPlugin (options = {}) {
 			});
 
 			async function loader (filePath) {
+				const dirname = path.dirname(filePath);
+
 				const { source, watchFiles } = await compile({
 					filePath: filePath,
 					cwd,
@@ -117,9 +117,16 @@ export default function vanillaExtractPlugin (options = {}) {
 					source,
 					outputCss,
 					identOption,
-					serializeVirtualCssPath: ({ source }) => {
-						css = source;
-						return `import ${JSON.stringify(path.basename(filePath) + '?__css')};`;
+					serializeVirtualCssPath: ({ fileScope, source }) => {
+						const filename = path.resolve(fileScope.filePath);
+
+						if (filePath === filename) {
+							css = source;
+							return `import ${JSON.stringify(path.basename(filename) + '?__css')};`;
+						}
+						else {
+							return `import ${JSON.stringify(path.relative(dirname, filename))};`;
+						}
 					},
 				});
 
