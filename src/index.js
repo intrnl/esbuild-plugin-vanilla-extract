@@ -130,10 +130,10 @@ export default function vanillaExtractPlugin (options = {}) {
 
 						if (filePath === filename) {
 							css = source;
-							return `import ${JSON.stringify(path.basename(filename) + '?__css')};`;
+							return `import ${JSON.stringify(basename(filename) + '?__css')};`;
 						}
 						else {
-							return `import ${JSON.stringify(path.relative(dirname, filename))};`;
+							return `import ${JSON.stringify(relative(dirname, filename))};`;
 						}
 					},
 				});
@@ -146,4 +146,18 @@ export default function vanillaExtractPlugin (options = {}) {
 			}
 		},
 	};
+}
+
+function basename (pathname, ext) {
+	return './' + path.basename(pathname, ext);
+}
+
+function relative (from, to) {
+	let pathname = path.relative(from, to);
+
+	if (pathname.slice(0, 3) !== '../') {
+		pathname = './' + pathname;
+	}
+
+	return pathname;
 }
