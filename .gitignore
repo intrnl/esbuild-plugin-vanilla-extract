@@ -1,6 +1,8 @@
 node_modules/
 dist/
 
+test/_*
+
 .npm-*.log
 .yarn-*.log
 .pnpm-*.log
