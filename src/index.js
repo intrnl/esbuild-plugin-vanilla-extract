@@ -11,10 +11,9 @@ import { FSCache, getProjectRoot } from '@intrnl/fs-cache';
 
 
 const RE_CSS_FILTER = /\.css\.(js|mjs|jsx|ts|mts|tsx)$/i;
-const RE_VIRT_FILTER = /\?__css$/;
-const NS = 'vanilla-extract';
+const SUFFIX = '?css';
 
-const VERSION = 1;
+const VERSION = 2;
 
 /** @returns {esbuild.Plugin} */
 export default function vanillaExtractPlugin (options = {}) {
@@ -44,7 +43,24 @@ export default function vanillaExtractPlugin (options = {}) {
 			});
 
 			build.onLoad({ filter: RE_CSS_FILTER }, async (args) => {
-				const { path: filename, namespace } = args;
+				const { path: filename, namespace, suffix } = args;
+
+				if (suffix === SUFFIX) {
+					const source = cssCache.get(path.relative('.', filename));
+
+					if (!source) {
+						return null;
+					}
+
+					if (typeof processCss === 'function') {
+						source = await processCss(source, filename);
+					}
+
+					return {
+						loader: 'css',
+						contents: source,
+					};
+				}
 
 				if (namespace !== 'file' && namespace !== '') {
 					return null;
@@ -67,37 +83,6 @@ export default function vanillaExtractPlugin (options = {}) {
 					loader: 'js',
 					contents: result.js,
 					watchFiles: result.dependencies,
-				};
-			});
-
-			build.onResolve({ filter: RE_VIRT_FILTER }, (args) => {
-				const { path: file, importer } = args;
-
-				const dirname = path.relative('.', path.dirname(importer));
-				const filename = path.join(dirname, file.slice(0, -6));
-
-				if (!cssCache.has(filename)) {
-					return null;
-				}
-
-				return {
-					namespace: NS,
-					path: filename,
-				};
-			});
-
-			build.onLoad({ filter: /./, namespace: NS }, async (args) => {
-				const { path: filename } = args;
-
-				let source = cssCache.get(filename);
-
-				if (typeof processCss === 'function') {
-					source = await processCss(source, filename);
-				}
-
-				return {
-					loader: 'css',
-					contents: source,
 				};
 			});
 
@@ -130,7 +115,7 @@ export default function vanillaExtractPlugin (options = {}) {
 
 						if (filePath === filename) {
 							css = source;
-							return `import ${JSON.stringify(basename(filename) + '?__css')};`;
+							return `import ${JSON.stringify(basename(filename) + SUFFIX)};`;
 						}
 						else {
 							return `import ${JSON.stringify(relative(dirname, filename))};`;
