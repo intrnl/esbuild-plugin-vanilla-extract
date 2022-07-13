@@ -6,7 +6,7 @@
 	"author": "intrnl",
 	"license": "MIT",
 	"repository": {
-		"url": "https://github.com/intrnl/esbuild-plugin-vanilla-extract"
+		"url": "https://codeberg.org/intrnl/esbuild-plugin-vanilla-extract"
 	},
 	"files": [
 		"src/"
