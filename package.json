@@ -2,7 +2,7 @@
 	"type": "module",
 	"name": "@intrnl/esbuild-plugin-vanilla-extract",
 	"description": "Fork of the official vanilla-extract esbuild plugin",
-	"version": "0.2.2",
+	"version": "0.3.0",
 	"author": "intrnl",
 	"license": "MIT",
 	"repository": {
