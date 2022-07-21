@@ -9,6 +9,6 @@ await esbuild.build({
 	entryPoints: ['./index.js'],
 	outfile: './_app.js',
 	plugins: [
-		vanillaExtractPlugin(),
+		vanillaExtractPlugin({ cache: false }),
 	],
 });

@@ -1,19 +1,19 @@
+import * as path from 'node:path';
+
 import * as esbuild from 'esbuild';
-import * as path from 'path';
-
-import {
-	compile,
-	processVanillaFile,
-	vanillaExtractFilescopePlugin
-} from '@vanilla-extract/integration';
-
 import { FSCache, getProjectRoot } from '@intrnl/fs-cache';
+import {
+	RE_CSS_FILTER,
+	fileScopePlugin,
+	compileVanillaFile,
+	evaluateVanillaFile,
+	processVanillaFile,
+} from './process.js';
 
 
-const RE_CSS_FILTER = /\.css\.(js|mjs|jsx|ts|mts|tsx)$/i;
 const SUFFIX = '?css';
 
-const VERSION = 2;
+const VERSION = 3;
 
 /** @returns {esbuild.Plugin} */
 export default function vanillaExtractPlugin (options = {}) {
@@ -21,13 +21,13 @@ export default function vanillaExtractPlugin (options = {}) {
 		cache = true,
 		runtime,
 		processCss,
-		outputCss,
+		outputCss = true,
 		identifiers,
-		externals = [],
+		esbuildOptions,
 	} = options;
 
 	if (runtime) {
-		return vanillaExtractFilescopePlugin();
+		return fileScopePlugin;
 	}
 
 	return {
@@ -70,7 +70,7 @@ export default function vanillaExtractPlugin (options = {}) {
 					VERSION,
 					outputCss,
 					identOption,
-					externals,
+					esbuildOptions,
 				];
 
 				const result = cache
@@ -86,47 +86,40 @@ export default function vanillaExtractPlugin (options = {}) {
 				};
 			});
 
-			async function loader (filePath) {
-				const dirname = path.dirname(filePath);
+			async function loader (filename) {
+				const dirname = path.dirname(filename);
 
-				const { source, watchFiles } = await compile({
-					filePath: filePath,
+				const { source, dependencies } = await compileVanillaFile({
+					filename,
 					cwd,
-					externals,
+					esbuildOptions,
 				});
 
-				let css = '';
-
-				const js = await processVanillaFile({
-					filePath: filePath,
+				const data = evaluateVanillaFile({
+					filename,
 					source,
 					outputCss,
 					identOption,
-					serializeVirtualCssPath: ({ fileScope, source }) => {
-						// Even though this also generates the corresponding CSS files for
-						// dependencies, we're ignoring them and opt for importing its
-						// original JS file instead.
+				});
 
-						// We can't expect its dependencies to already exist in the cache
-						// map, but we also don't want to fit the dependencies into another
-						// file's cache data.
-
-						const filename = path.resolve(fileScope.filePath);
-
-						if (filePath === filename) {
-							css = source;
-							return `import ${JSON.stringify(basename(filename) + SUFFIX)};`;
+				const { js, css } = processVanillaFile({
+					filename,
+					cwd,
+					data,
+					serializeImport: (pathname, isEntry) => {
+						if (isEntry) {
+							return `import ${JSON.stringify(basename(pathname) + SUFFIX)};`;
 						}
 						else {
-							return `import ${JSON.stringify(relative(dirname, filename))};`;
+							return `import ${JSON.stringify(relative(dirname, pathname))};`;
 						}
 					},
 				});
 
 				return {
-					js,
-					css,
-					dependencies: watchFiles.reverse(),
+					js: js,
+					css: css,
+					dependencies: dependencies,
 				};
 			}
 		},

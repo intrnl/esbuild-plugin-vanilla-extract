@@ -1,5 +1,4 @@
-import { Plugin } from 'esbuild';
-import { IdentifierOption } from '@vanilla-extract/integration';
+import { Plugin, BuildOptions } from 'esbuild';
 
 
 export default function vanillaExtractPlugin (options?: PluginOptions): Plugin;
@@ -7,8 +6,9 @@ export default function vanillaExtractPlugin (options?: PluginOptions): Plugin;
 export interface PluginOptions {
 	cache?: boolean;
   outputCss?: boolean;
-  externals?: Array<string>;
+  esbuildOptions?: Pick<BuildOptions, 'plugins' | 'external' | 'define' | 'loader'>;
   runtime?: boolean;
+	unsafe?: boolean;
   processCss?: (css: string) => Promise<string>;
-  identifiers?: IdentifierOption;
+  identifiers?: 'short' | 'debug';
 }
