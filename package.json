@@ -16,13 +16,13 @@
 		"esbuild": ">=0.13.15"
 	},
 	"dependencies": {
-		"@emotion/hash": "^0.8.0",
+		"@emotion/hash": "^0.9.0",
 		"@intrnl/fs-cache": "^0.2.3",
 		"eval": "^0.1.8",
 		"javascript-stringify": "^2.1.0"
 	},
 	"devDependencies": {
-		"@vanilla-extract/css": "^1.7.2",
-		"esbuild": "^0.14.47"
+		"@vanilla-extract/css": "^1.9.2",
+		"esbuild": "^0.15.15"
 	}
 }
