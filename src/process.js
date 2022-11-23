@@ -132,11 +132,11 @@ export function processVanillaFile (options) {
 	const { filename, cwd = process.cwd(), data, serializeImport } = options;
 	const { cssByFileScope, localClassNames, composedClassLists, usedCompositions, cssExports } = data;
 
-  const unusedCompositions = composedClassLists
+	const unusedCompositions = composedClassLists
 		.filter(({ identifier }) => !usedCompositions.has(identifier))
 		.map(({ identifier }) => identifier);
 
-  const unusedCompositionRegex =
+	const unusedCompositionRegex =
 		unusedCompositions.length > 0
 			? RegExp(`(${unusedCompositions.join('|')})\\s`, 'g')
 			: null;
@@ -181,15 +181,15 @@ function serializeVanillaModule (cssImports, cssExports, unusedRegex) {
 
 function stringifyExports(recipeImports, value, unusedCompositionRegex) {
 	const options = {
-    references: true,
-    maxDepth: Infinity,
-    maxValues: Infinity
-  };
+		references: true,
+		maxDepth: Infinity,
+		maxValues: Infinity
+	};
 
-  return stringify(value, (value, _indent, next) => {
-    const valueType = typeof value;
+	return stringify(value, (value, _indent, next) => {
+		const valueType = typeof value;
 
-    if (
+		if (
 			valueType === 'boolean' ||
 			valueType === 'number' ||
 			valueType === 'undefined' ||
@@ -197,65 +197,65 @@ function stringifyExports(recipeImports, value, unusedCompositionRegex) {
 			Array.isArray(value) ||
 			isPlainObject(value)
 		) {
-      return next(value);
-    }
+			return next(value);
+		}
 
-    if (valueType === 'string') {
+		if (valueType === 'string') {
 			const replacement = unusedCompositionRegex
 				? value.replace(unusedCompositionRegex, '')
 				: value;
 
-      return next(replacement);
-    }
+			return next(replacement);
+		}
 
-    if (valueType === 'function' && (value.__function_serializer__ || value.__recipe__)) {
-      const { importPath, importName, args } = value.__function_serializer__ || value.__recipe__;
+		if (valueType === 'function' && (value.__function_serializer__ || value.__recipe__)) {
+			const { importPath, importName, args } = value.__function_serializer__ || value.__recipe__;
 
-      if (typeof importPath !== 'string' || typeof importName !== 'string' || !Array.isArray(args)) {
-        throw new Error('Invalid recipe');
-      }
+			if (typeof importPath !== 'string' || typeof importName !== 'string' || !Array.isArray(args)) {
+				throw new Error('Invalid recipe');
+			}
 
-      try {
-        const hashedImportName = `_${hash(`${importName}${importPath}`).slice(0, 5)}`;
-        recipeImports.add(`import { ${importName} as ${hashedImportName} } from ${JSON.stringify(importPath)};`);
+			try {
+				const hashedImportName = `_${hash(`${importName}${importPath}`).slice(0, 5)}`;
+				recipeImports.add(`import { ${importName} as ${hashedImportName} } from ${JSON.stringify(importPath)};`);
 
 				const stringifiedArgs = args
 					.map((arg) => stringifyExports(recipeImports, arg, unusedCompositionRegex))
 					.join(', ');
 
-        return `${hashedImportName}(${stringifiedArgs})`;
-      } catch (err) {
-        console.error(err);
-        throw new Error('Invalid recipe.');
-      }
-    }
+				return `${hashedImportName}(${stringifiedArgs})`;
+			} catch (err) {
+				console.error(err);
+				throw new Error('Invalid recipe.');
+			}
+		}
 
-    throw new Error('Invalid exports');
-  }, 0, options);
+		throw new Error('Invalid exports');
+	}, 0, options);
 }
 
 function isPlainObject (o) {
-  if (!hasObjectPrototype(o)) {
-    return false;
-  }
+	if (!hasObjectPrototype(o)) {
+		return false;
+	}
 
-  const ctor = o.constructor;
-  if (typeof ctor === 'undefined') {
-    return true;
-  }
+	const ctor = o.constructor;
+	if (typeof ctor === 'undefined') {
+		return true;
+	}
 
-  const prot = ctor.prototype;
-  if (!hasObjectPrototype(prot)) {
-    return false;
-  }
+	const prot = ctor.prototype;
+	if (!hasObjectPrototype(prot)) {
+		return false;
+	}
 
-  if (!prot.hasOwnProperty('isPrototypeOf')) {
-    return false;
-  }
+	if (!prot.hasOwnProperty('isPrototypeOf')) {
+		return false;
+	}
 
-  return true;
+	return true;
 }
 
 function hasObjectPrototype (o) {
-  return Object.prototype.toString.call(o) === '[object Object]';
+	return Object.prototype.toString.call(o) === '[object Object]';
 }
