@@ -1,5 +1,4 @@
-import { Plugin, BuildOptions } from 'esbuild';
-
+import { BuildOptions, Plugin } from 'esbuild';
 
 export default function vanillaExtractPlugin (options?: PluginOptions): Plugin;
 

@@ -1,11 +1,11 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import * as esbuild from 'esbuild';
-import { transformCss } from '@vanilla-extract/css/transformCss';
-import { stringify } from 'javascript-stringify';
 import hash from '@emotion/hash';
+import { transformCss } from '@vanilla-extract/css/transformCss';
+import * as esbuild from 'esbuild';
 import evalCode from 'eval';
+import { stringify } from 'javascript-stringify';
 
 export const RE_CSS_FILTER = /\.css\.(js|mjs|jsx|ts|mts|tsx)$/i;
 
@@ -82,13 +82,17 @@ export function evaluateVanillaFile (options) {
 	const usedCompositions = new Set();
 
 	const cssAdapter = {
-		appendCss (css, fileScope) {${outputCss ? `
+		appendCss (css, fileScope) {${
+		outputCss
+			? `
 			const filename = fileScope.filePath;
 			const sources = cssByFileScope.get(filename) ?? [];
 
 			sources.push(css);
 
-			cssByFileScope.set(filename, sources);` : ''}
+			cssByFileScope.set(filename, sources);`
+			: ''
+	}
 		},
 		registerClassName (className) {
 			localClassNames.add(className);
@@ -136,10 +140,9 @@ export function processVanillaFile (options) {
 		.filter(({ identifier }) => !usedCompositions.has(identifier))
 		.map(({ identifier }) => identifier);
 
-	const unusedCompositionRegex =
-		unusedCompositions.length > 0
-			? RegExp(`(${unusedCompositions.join('|')})\\s`, 'g')
-			: null;
+	const unusedCompositionRegex = unusedCompositions.length > 0
+		? RegExp(`(${unusedCompositions.join('|')})\\s`, 'g')
+		: null;
 
 	const cssImports = [];
 	let css = '';
@@ -179,59 +182,65 @@ function serializeVanillaModule (cssImports, cssExports, unusedRegex) {
 	return outputCode.join('\n');
 }
 
-function stringifyExports(recipeImports, value, unusedCompositionRegex) {
+function stringifyExports (recipeImports, value, unusedCompositionRegex) {
 	const options = {
 		references: true,
 		maxDepth: Infinity,
-		maxValues: Infinity
+		maxValues: Infinity,
 	};
 
-	return stringify(value, (value, _indent, next) => {
-		const valueType = typeof value;
+	return stringify(
+		value,
+		(value, _indent, next) => {
+			const valueType = typeof value;
 
-		if (
-			valueType === 'boolean' ||
-			valueType === 'number' ||
-			valueType === 'undefined' ||
-			value === null ||
-			Array.isArray(value) ||
-			isPlainObject(value)
-		) {
-			return next(value);
-		}
-
-		if (valueType === 'string') {
-			const replacement = unusedCompositionRegex
-				? value.replace(unusedCompositionRegex, '')
-				: value;
-
-			return next(replacement);
-		}
-
-		if (valueType === 'function' && (value.__function_serializer__ || value.__recipe__)) {
-			const { importPath, importName, args } = value.__function_serializer__ || value.__recipe__;
-
-			if (typeof importPath !== 'string' || typeof importName !== 'string' || !Array.isArray(args)) {
-				throw new Error('Invalid recipe');
+			if (
+				valueType === 'boolean'
+				|| valueType === 'number'
+				|| valueType === 'undefined'
+				|| value === null
+				|| Array.isArray(value)
+				|| isPlainObject(value)
+			) {
+				return next(value);
 			}
 
-			try {
-				const hashedImportName = `_${hash(`${importName}${importPath}`).slice(0, 5)}`;
-				recipeImports.add(`import { ${importName} as ${hashedImportName} } from ${JSON.stringify(importPath)};`);
+			if (valueType === 'string') {
+				const replacement = unusedCompositionRegex
+					? value.replace(unusedCompositionRegex, '')
+					: value;
 
-				const stringifiedArgs = args
-					.map((arg) => stringifyExports(recipeImports, arg, unusedCompositionRegex))
-					.join(', ');
-
-				return `${hashedImportName}(${stringifiedArgs})`;
-			} catch (err) {
-				console.error(err);
-				throw new Error('Invalid recipe.');
+				return next(replacement);
 			}
-		}
 
-		throw new Error('Invalid exports');
-	}, 0, options);
+			if (valueType === 'function' && (value.__function_serializer__ || value.__recipe__)) {
+				const { importPath, importName, args } = value.__function_serializer__ || value.__recipe__;
+
+				if (typeof importPath !== 'string' || typeof importName !== 'string' || !Array.isArray(args)) {
+					throw new Error('Invalid recipe');
+				}
+
+				try {
+					const hashedImportName = `_${hash(`${importName}${importPath}`).slice(0, 5)}`;
+					recipeImports.add(`import { ${importName} as ${hashedImportName} } from ${JSON.stringify(importPath)};`);
+
+					const stringifiedArgs = args
+						.map((arg) => stringifyExports(recipeImports, arg, unusedCompositionRegex))
+						.join(', ');
+
+					return `${hashedImportName}(${stringifiedArgs})`;
+				}
+				catch (err) {
+					console.error(err);
+					throw new Error('Invalid recipe.');
+				}
+			}
+
+			throw new Error('Invalid exports');
+		},
+		0,
+		options,
+	);
 }
 
 function isPlainObject (o) {

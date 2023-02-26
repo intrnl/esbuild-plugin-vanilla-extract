@@ -1,15 +1,14 @@
 import * as path from 'node:path';
 
-import * as esbuild from 'esbuild';
 import { FSCache, getProjectRoot } from '@intrnl/fs-cache';
+import * as esbuild from 'esbuild';
 import {
-	RE_CSS_FILTER,
-	fileScopePlugin,
 	compileVanillaFile,
 	evaluateVanillaFile,
+	fileScopePlugin,
 	processVanillaFile,
+	RE_CSS_FILTER,
 } from './process.js';
-
 
 const SUFFIX = '?css';
 
