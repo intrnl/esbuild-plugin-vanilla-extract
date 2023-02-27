@@ -41,38 +41,10 @@ export const fileScopePlugin = {
 	},
 };
 
-const KEY = 'c' + ('' + Math.random()).slice(2, 8);
-
 export async function compileVanillaFile (options) {
-	const { filename, cwd = process.cwd(), esbuildOptions = {} } = options;
+	const { filename, cwd = process.cwd(), esbuildOptions = {}, outputCss = true, identOption = 'debug' } = options;
 
-	const result = await esbuild.build({
-		bundle: true,
-		write: false,
-		metafile: true,
-		format: 'cjs',
-		platform: 'node',
-		entryPoints: [filename],
-		absWorkingDir: cwd,
-		external: ['@vanilla-extract', ...(esbuildOptions.external || [])],
-		plugins: [
-			fileScopePlugin,
-			...(esbuildOptions.plugins || []),
-		],
-		loader: esbuildOptions.loader,
-		define: esbuildOptions.define,
-	});
-
-	const { outputFiles, metafile } = result;
-
-	return {
-		source: outputFiles[0].text,
-		dependencies: Object.keys(metafile.inputs).map((pathname) => path.join(cwd, pathname)).reverse(),
-	};
-}
-
-export function evaluateVanillaFile (options) {
-	const { filename, source, outputCss = true, identOption = 'debug' } = options;
+	const KEY = 'c' + Math.random().toString(36).slice(2, 8);
 
 	const banner = `
 (() => {
@@ -121,13 +93,38 @@ export function evaluateVanillaFile (options) {
 })();
 `;
 
-	const globals = {
-		console,
-		process,
-	};
+	const result = await esbuild.build({
+		bundle: true,
+		write: false,
+		metafile: true,
+		format: 'cjs',
+		platform: 'node',
+		entryPoints: [filename],
+		banner: { js: banner },
+		footer: { js: footer },
+		absWorkingDir: cwd,
+		external: ['@vanilla-extract', ...(esbuildOptions.external || [])],
+		plugins: [
+			fileScopePlugin,
+			...(esbuildOptions.plugins || []),
+		],
+		loader: esbuildOptions.loader,
+		define: esbuildOptions.define,
+	});
 
-	const sourcery = banner + source + footer;
-	const result = evalCode(sourcery, filename, globals, true);
+	const { outputFiles, metafile } = result;
+
+	return {
+		source: outputFiles[0].text,
+		dependencies: Object.keys(metafile.inputs).map((pathname) => path.join(cwd, pathname)).reverse(),
+	};
+}
+
+export function evaluateVanillaFile (options) {
+	const { filename, source } = options;
+
+	const globals = { console, process };
+	const result = evalCode(source, filename, globals, true);
 
 	return result;
 }

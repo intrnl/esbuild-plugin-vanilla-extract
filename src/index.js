@@ -92,14 +92,11 @@ export default function vanillaExtractPlugin (options = {}) {
 					filename,
 					cwd,
 					esbuildOptions,
-				});
-
-				const data = evaluateVanillaFile({
-					filename,
-					source,
 					outputCss,
 					identOption,
 				});
+
+				const data = evaluateVanillaFile({ filename, source });
 
 				const { js, css } = processVanillaFile({
 					filename,
