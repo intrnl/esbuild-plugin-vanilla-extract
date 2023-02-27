@@ -44,7 +44,7 @@ export const fileScopePlugin = {
 export async function compileVanillaFile (options) {
 	const { filename, cwd = process.cwd(), esbuildOptions = {}, outputCss = true, identOption = 'debug' } = options;
 
-	const KEY = 'c' + Math.random().toString(36).slice(2, 8);
+	const KEY = '_' + Math.random().toString(36).slice(2, 8);
 
 	const banner = `
 (() => {
@@ -165,21 +165,44 @@ export function processVanillaFile (options) {
 	return { js, css };
 }
 
-function serializeVanillaModule (cssImports, cssExports, unusedRegex) {
-	const recipeImports = new Set();
+function serializeVanillaModule (cssImports, cssExports, unusedCompositionRegex) {
+	const functionSerializationImports = new Set();
 
-	const moduleExports = Object.keys(cssExports).map((key) => (
-		key === 'default'
-			? `export ${key} ${stringifyExports(recipeImports, cssExports[key], unusedRegex)};`
-			: `export const ${key} = ${stringifyExports(recipeImports, cssExports[key], unusedRegex)};`
-	));
+	const defaultExportName = '_' + Math.random().toString(36).slice(2, 8);
 
-	const outputCode = [...cssImports, ...recipeImports, ...moduleExports];
+	const exportLookup = new Map(
+		Object.entries(cssExports).map(([key, value]) => [value, key === 'default' ? defaultExportName : key]),
+	);
+
+	const moduleExports = Object.keys(cssExports).map((key) => {
+		const serializedExport = stringifyExports(
+			functionSerializationImports,
+			cssExports[key],
+			unusedCompositionRegex,
+			key === 'default' ? defaultExportName : key,
+			exportLookup,
+		);
+
+		if (key === 'default') {
+			return (
+				`var ${defaultExportName} = ${serializedExport};\n`
+				+ `export default ${defaultExportName};`
+			);
+		}
+
+		return `export var ${key} = ${serializedExport};`;
+	});
+
+	const outputCode = [
+		...cssImports,
+		...functionSerializationImports,
+		...moduleExports,
+	];
 
 	return outputCode.join('\n');
 }
 
-function stringifyExports (recipeImports, value, unusedCompositionRegex) {
+function stringifyExports (functionSerializationImports, value, unusedCompositionRegex, key, exportLookup) {
 	const options = {
 		references: true,
 		maxDepth: Infinity,
@@ -191,49 +214,60 @@ function stringifyExports (recipeImports, value, unusedCompositionRegex) {
 		(value, _indent, next) => {
 			const valueType = typeof value;
 
-			if (
-				valueType === 'boolean'
-				|| valueType === 'number'
-				|| valueType === 'undefined'
-				|| value === null
-				|| Array.isArray(value)
-				|| isPlainObject(value)
-			) {
+			if (valueType === 'boolean' || valueType === 'number' || valueType === 'undefined' || value === null) {
 				return next(value);
 			}
 
-			if (valueType === 'string') {
-				const replacement = unusedCompositionRegex
-					? value.replace(unusedCompositionRegex, '')
-					: value;
+			if (Array.isArray(value) || isPlainObject(value)) {
+				const reusedExport = exportLookup.get(value);
+				if (reusedExport && reusedExport !== key) {
+					return reusedExport;
+				}
+				return next(value);
+			}
 
-				return next(replacement);
+			if (Symbol.toStringTag in Object(value)) {
+				const { [Symbol.toStringTag]: _tag, ...valueWithoutTag } = value;
+
+				return next(valueWithoutTag);
+			}
+
+			if (valueType === 'string') {
+				const replacement = unusedCompositionRegex ? value.replace(unusedCompositionRegex, '') : value;
+
+				return next(
+					replacement,
+				);
 			}
 
 			if (valueType === 'function' && (value.__function_serializer__ || value.__recipe__)) {
 				const { importPath, importName, args } = value.__function_serializer__ || value.__recipe__;
 
 				if (typeof importPath !== 'string' || typeof importName !== 'string' || !Array.isArray(args)) {
-					throw new Error('Invalid recipe');
+					throw new Error('Invalid function serialization params');
 				}
 
 				try {
 					const hashedImportName = `_${hash(`${importName}${importPath}`).slice(0, 5)}`;
-					recipeImports.add(`import { ${importName} as ${hashedImportName} } from ${JSON.stringify(importPath)};`);
 
-					const stringifiedArgs = args
-						.map((arg) => stringifyExports(recipeImports, arg, unusedCompositionRegex))
-						.join(', ');
+					const serializedArgs = args.map(
+						(arg) => stringifyExports(functionSerializationImports, arg, unusedCompositionRegex, key, exportLookup),
+					);
 
-					return `${hashedImportName}(${stringifiedArgs})`;
+					functionSerializationImports.add(
+						`import { ${importName} as ${hashedImportName} } from '${importPath}';`,
+					);
+
+					return `${hashedImportName}(${serializedArgs.join(',')})`;
 				}
 				catch (err) {
 					console.error(err);
-					throw new Error('Invalid recipe.');
+					throw new Error('Invalid function serialization params');
 				}
 			}
-
-			throw new Error('Invalid exports');
+			throw new Error(
+				`Invalid exports.\nYou can only export plain objects, arrays, strings, numbers and null/undefined.`,
+			);
 		},
 		0,
 		options,
